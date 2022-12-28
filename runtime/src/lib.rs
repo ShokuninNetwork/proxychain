@@ -57,7 +57,8 @@ use xcm::latest::prelude::BodyId;
 use xcm_executor::XcmExecutor;
 
 /// Import the template pallet.
-pub use pallet_template;
+pub use pallet_accountscript;
+pub use pallet_anyone;
 
 /// Alias to 512-bit hash when used in the context of a transaction signature on the chain.
 pub type Signature = MultiSignature;
@@ -457,9 +458,70 @@ impl pallet_collator_selection::Config for Runtime {
 	type WeightInfo = ();
 }
 
+
+parameter_types! {
+	pub const AnyoneId: PalletId = PalletId(*b"anyone__");
+	pub const AnyoneIsRoot: bool = true;
+	pub storage AnyoneSudoDelay: u32 = 1200; // ~2-4 hours
+	pub storage CancelDepositExec: u32 = 2000000000;
+	pub storage MaxSudoCalls: u32 = 200;
+	pub storage SudoDepositExec: u32 = 2000000000/2;
+	pub const CallableVecMaxLength: u32 = 5000000;
+}
+
 /// Configure the pallet template in pallets/template.
-impl pallet_template::Config for Runtime {
+impl pallet_anyone::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
+	type Callable = RuntimeCall;
+	type PalletId = AnyoneId;
+	type AnyoneIsRoot = AnyoneIsRoot;
+	type AnyoneSudoDelay = AnyoneSudoDelay;
+	type Currency = Balances;
+	type CancelDepositExec = CancelDepositExec;
+	type MaxSudoCalls = MaxSudoCalls;
+	type SudoDepositExec = SudoDepositExec;
+	type CallableVecMaxLength = CallableVecMaxLength;
+}
+
+parameter_types! {
+	pub storage FeePerByte: u32 = 1;
+	pub const MaxBytesPerItem: BlockNumber = u32::MAX;
+
+}
+
+impl pallet_accountscript::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type Callable = RuntimeCall;
+	type Currency = Balances;
+	type BlockFeePerByte = FeePerByte;
+	type MaxBytesPerItem = MaxBytesPerItem;
+	type MaxBytesTotal = MaxBytesPerItem;
+	type NumberOfBlocks = BlockNumber;
+	type StorageHandler = Script;
+}
+
+parameter_types! {
+	pub const MaxCalls: u32 = 1;
+	pub const MaxGenerateRandom: u32 = 10;
+	pub const LotteryId: PalletId = PalletId(*b"lotteryp");
+}
+
+impl pallet_lottery::Config for Runtime {
+	type Currency = Balances;
+	type ManagerOrigin = EnsureRoot<AccountId>;
+	type MaxCalls = MaxCalls;
+	type MaxGenerateRandom = MaxGenerateRandom;
+	type PalletId = LotteryId;
+	type Randomness = CollectiveCoinFlip;
+	type RuntimeCall = RuntimeCall;
+	type RuntimeEvent = RuntimeEvent;
+	type ValidateCall = Script;
+	type WeightInfo = ();
+}
+
+impl pallet_randomness_collective_flip::Config for Runtime {
+	
+	
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
@@ -476,6 +538,7 @@ construct_runtime!(
 		} = 1,
 		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent} = 2,
 		ParachainInfo: parachain_info::{Pallet, Storage, Config} = 3,
+		CollectiveCoinFlip: pallet_randomness_collective_flip::{Pallet} = 4,
 
 		// Monetary stuff.
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>} = 10,
@@ -494,8 +557,10 @@ construct_runtime!(
 		CumulusXcm: cumulus_pallet_xcm::{Pallet, Event<T>, Origin} = 32,
 		DmpQueue: cumulus_pallet_dmp_queue::{Pallet, Call, Storage, Event<T>} = 33,
 
-		// Template
-		TemplatePallet: pallet_template::{Pallet, Call, Storage, Event<T>}  = 40,
+		// Extra
+		Anyone: pallet_anyone::{Pallet, Call, Storage, Event<T>}  = 40,
+		Lottery: pallet_lottery::{Pallet, Call, Storage, Event<T>} = 41,
+		Script: pallet_accountscript::{Pallet, Call, Storage, Event<T>} = 42,
 	}
 );
 
